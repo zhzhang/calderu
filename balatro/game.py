@@ -3,8 +3,8 @@ from enum import Enum
 from random import shuffle
 from typing import List
 
-from cards import DEFAULT_DECK, RANK_TO_CHIPS
-from hands import DEFAULT_HANDS
+from .cards import DEFAULT_DECK, RANK_TO_CHIPS
+from .hands import DEFAULT_HANDS
 
 
 class View(Enum):
@@ -43,27 +43,51 @@ class Game:
         shuffle(deck)
         self.deck = deck
 
-    def deal(self, n: int = 8):
-        print(self.hand)
-        for _ in range(n):
+    def deal(self, hand_size: int = 8):
+        while len(self.hand) < hand_size and len(self.deck) > 0:
             tmp = self.deck.pop()
             self.hand.append(tmp)
 
-    def action(self, selected_cards: List[int], action: RoundAction):
-        selected_cards = [self.hand[card] for card in selected_cards]
+    def action(self, selected_card_idx: List[int], action: RoundAction):
         if action == RoundAction.PLAY:
+            self.hands -= 1
+            selected_cards = [self.hand[card] for card in selected_card_idx]
+            self.hand = [
+                self.hand[card_idx]
+                for card_idx in range(len(self.hand))
+                if card_idx not in selected_card_idx
+            ]
             chips = 0
             mult = 0
             for hand_type in self.hand_instances:
-                if hand_type.check(selected_cards):
-                    print(hand_type)
+                hands_cards = hand_type.check(selected_cards)
+                if hands_cards:
                     chips = hand_type.chips
-                    for card in selected_cards:
+                    for card in hands_cards:
                         chips += card.chips
                     mult = hand_type.mult
                     break
             self.score += chips * mult
-        print(self.score)
+            self.deal()
+        elif action == RoundAction.DISCARD:
+            self.discards -= 1
+            self.hand = [
+                self.hand[card_idx]
+                for card_idx in range(len(self.hand))
+                if card_idx not in selected_card_idx
+            ]
+            self.deal()
+
+    def __str__(self):
+        acc = ""
+        for card in self.hand:
+            acc += f"{card}\n"
+        acc += f"Score: {self.score}\n"
+        if self.score >= 300:
+            acc += "You win!"
+        else:
+            acc += "Please response with your next move:"
+        return acc
 
     def execute_command(self, command: str):
         command, *rest = command.split(" ")
@@ -71,11 +95,15 @@ class Game:
         if command == "p":
             selected_cards = [int(card) for card in rest]
             self.action(selected_cards, RoundAction.PLAY)
+        if command == "d":
+            selected_cards = [int(card) for card in rest]
+            self.action(selected_cards, RoundAction.DISCARD)
 
 
 if __name__ == "__main__":
     game = Game()
     game.deal()
+    print(game)
     while True:
         for i, card in enumerate(game.hand):
             print(f"{i}: {card}")
