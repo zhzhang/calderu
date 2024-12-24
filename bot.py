@@ -10,8 +10,8 @@ You will be given a list of poker cards.
 
 You may select UP TO 5 cards to play or discard.
 The possible commands are:
-p <card1> <card2> ... <card5> - Play the selected cards.
-d <card1> <card2> ... <card5> - Discard the selected cards.
+p <card1> <card2> ... <card5> - Play the selected cards and draw new ones from the deck.
+d <card1> <card2> ... <card5> - Discard the selected cards and draw new ones from the deck up to the original number of cards in hand.
 
 For example: "p 1 2 3" with the following cards will play the first three cards:
 0: FIVE of HEARTS
@@ -35,6 +35,8 @@ Four of a Kind: 60 chips * 7 multiplier
 Straight Flush: 100 chips * 8 multiplier
 Royal Flush: 100 chips * 8 multiplier
 
+The maximum number of cards you can play in a hand is 5.
+
 The chips of each card participating in hand is added to the base chips before that total is multiplied by the multiplier.
 The chips for each rank of card are:
 TWO: 2 chips
@@ -54,6 +56,13 @@ Cards are only scored if they participate in the hand.
 
 You must make a total of 300 chips within 4 hands and 3 discards to win.
 
+When making a move, please respond first with the command you with to execute,
+then with === as a separator, then your reasoning for the move.
+
+You must win within the allotted hands and discards, or the world ends, so don't save any discards.
+Discarding cards is a good way to create stronger hands, by searching the remaining deck for the best cards to play.
+You should try to discard cards until you can make at least a flush.
+
 GAME START
 """
 
@@ -61,17 +70,23 @@ client = anthropic.Anthropic()
 
 game = Game()
 game.deal()
-print(game)
-message = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1000,
-    temperature=0,
-    system=SYSTEM_PROMPT,
-    messages=[
-        {
-            "role": "user",
-            "content": [{"type": "text", "text": str(game)}],
-        }
-    ],
-)
-print(message.content)
+while game.score < 300 and game.hands > 0:
+    print(game)
+    message = client.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1000,
+        temperature=0,
+        system=SYSTEM_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": str(game)}],
+            }
+        ],
+    )
+    cmd, reasoning = message.content[0].text.split("===")
+    cmd = cmd.strip()
+    print(cmd)
+    print(reasoning)
+    game.execute_command(cmd)
+    print("--------------------")

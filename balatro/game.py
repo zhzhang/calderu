@@ -50,6 +50,9 @@ class Game:
 
     def action(self, selected_card_idx: List[int], action: RoundAction):
         if action == RoundAction.PLAY:
+            assert self.hands > 0
+            assert len(selected_card_idx) <= 5
+            assert len(selected_card_idx) > 0
             self.hands -= 1
             selected_cards = [self.hand[card] for card in selected_card_idx]
             self.hand = [
@@ -70,6 +73,7 @@ class Game:
             self.score += chips * mult
             self.deal()
         elif action == RoundAction.DISCARD:
+            assert self.discards > 0
             self.discards -= 1
             self.hand = [
                 self.hand[card_idx]
@@ -80,9 +84,11 @@ class Game:
 
     def __str__(self):
         acc = ""
-        for card in self.hand:
-            acc += f"{card}\n"
+        for i, card in enumerate(self.hand):
+            acc += f"{i}: {card}\n"
         acc += f"Score: {self.score}\n"
+        acc += f"Remaining Hands: {self.hands}\n"
+        acc += f"Remaining Discards: {self.discards}\n"
         if self.score >= 300:
             acc += "You win!"
         else:
@@ -91,7 +97,6 @@ class Game:
 
     def execute_command(self, command: str):
         command, *rest = command.split(" ")
-        print(command, rest)
         if command == "p":
             selected_cards = [int(card) for card in rest]
             self.action(selected_cards, RoundAction.PLAY)
