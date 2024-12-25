@@ -10,8 +10,8 @@ You will be given a list of poker cards.
 
 You may select UP TO 5 cards to play or discard.
 The possible commands are:
-p <card1> <card2> ... <card5> - Play the selected cards and draw new ones from the deck.
-d <card1> <card2> ... <card5> - Discard the selected cards and draw new ones from the deck up to the original number of cards in hand.
+play <card1> <card2> ... <card5> - Play the selected cards and draw new ones from the deck.
+discard <card1> <card2> ... <card5> - Discard the selected cards and draw new ones from the deck up to the original number of cards in hand.
 
 For example: "p 1 2 3" with the following cards will play the first three cards:
 0: FIVE of HEARTS
@@ -69,7 +69,6 @@ GAME START
 client = anthropic.Anthropic()
 
 game = Game()
-game.deal()
 while game.score < 300 and game.hands > 0:
     print(game)
     message = client.messages.create(

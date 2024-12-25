@@ -5,10 +5,22 @@ class Joker(ABC):
     def __init__(self, game):
         self.game = game
 
+    @abstractmethod
+    def trigger(self):
+        pass
+
 
 class BaseJoker(Joker):
+    """
+    Adds 4 to the mult.
+    """
+
     def __init__(self, game):
         super().__init__(game)
+
+    def trigger(self):
+        round = self.game.stage
+        round.mult += 4
 
 
 class Greedy(Joker):

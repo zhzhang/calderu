@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from .cards import Card
+from balatro.cards import Card
 
 
 class Hand(ABC):
