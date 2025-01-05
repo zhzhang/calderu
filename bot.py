@@ -35,23 +35,7 @@ Four of a Kind: 60 chips * 7 multiplier
 Straight Flush: 100 chips * 8 multiplier
 Royal Flush: 100 chips * 8 multiplier
 
-The maximum number of cards you can play in a hand is 5.
-
 The chips of each card participating in hand is added to the base chips before that total is multiplied by the multiplier.
-The chips for each rank of card are:
-TWO: 2 chips
-THREE: 3 chips
-FOUR: 4 chips
-FIVE: 5 chips
-SIX: 6 chips
-SEVEN: 7 chips
-EIGHT: 8 chips
-NINE: 9 chips
-TEN: 10 chips
-JACK: 10 chips
-QUEEN: 10 chips
-KING: 10 chips
-ACE: 11 chips
 Cards are only scored if they participate in the hand.
 
 You must make a total of 300 chips within 4 hands and 3 discards to win.
@@ -63,14 +47,117 @@ You must win within the allotted hands and discards, or the world ends, so don't
 Discarding cards is a good way to create stronger hands, by searching the remaining deck for the best cards to play.
 You should try to discard cards until you can make at least a flush.
 
-GAME START
+The maximum number of cards you can select for play or discard from a hand is 5.
+
+GAME STATE:
 """
 
-client = anthropic.Anthropic()
+ROUND_TRACK_PROMPT = """
+You are on the round track. You may choose to play or skip the current round.
+If you skip the current round, you receive a tag instead.
+To play the current round, type "play".
+To skip the current round, type "skip".
+"""
 
-game = Game()
-while game.score < 300 and game.hands > 0:
-    print(game)
+ROUND_PROMPT = """
+Available actions:
+play <card1> <card2> ... <card5> - Play the selected cards and draw new ones from the deck.
+"""
+
+SHOP_PROMPT = """
+You have reached the shop. You may purchase the following items:
+
+To purchase an item, type "buy <item_type> <item_position>".
+For example, to purchase the first item in the card section, type "buy card 1".
+To purchase the second booster pack in the booster pack section, type "buy booster 2".
+To purchase the first voucher in the voucher section, type "buy voucher 1".
+To continue to the next round, type "next".
+"""
+
+BOOSTER_PROMPT = """
+You have opened a booster pack! You may select cards from the booster pack.
+To select a card, type "select <card_position>".
+If you do not wish to select any cards, type "skip".
+"""
+
+
+def hand_to_string(hand):
+    acc = ""
+    for i, card in enumerate(hand):
+        acc += f"{i+1}: {card['name']}\n"
+    return acc
+
+
+def decsribe_shop_object(obj):
+    return f"Name: {obj['name']}. Description: {obj['description']}. Cost: {obj['cost']} dollars.\n"
+
+
+def describe_pack_object(obj):
+    return f"Name: {obj['name']}. Description: {obj['description']}.\n"
+
+
+def build_state_string(state):
+    acc = ""
+    game_step = state["state"]
+    if game_step in ["SELECTING_HAND"]:
+        acc += hand_to_string(state["hand"])
+        acc += f"Remaining hands: {state['hands_left']})\n"
+        acc += f"Remaining discards: {state['discards_left']})\n"
+    if game_step == "SHOP":
+        acc += "Shop Cards:\n"
+        for i, card in enumerate(state["shop_cards"]):
+            acc += f"{i+1}: {decsribe_shop_object(card)}"
+        acc += "Shop Boosters:\n"
+        for i, booster in enumerate(state["shop_boosters"]):
+            acc += f"{i+1}: {decsribe_shop_object(booster)}"
+        acc += "Shop Vouchers:\n"
+        for i, voucher in enumerate(state["shop_vouchers"]):
+            acc += f"{i+1}: {decsribe_shop_object(voucher)}"
+    if game_step == "BUFFOON_PACK":
+        acc += "Booster Joker Cards:\n"
+        for i, card in enumerate(state["pack_choices"]):
+            acc += f"{i+1}: {describe_pack_object(card)}"
+    acc += f"Current Money: {state['dollars']}\n"
+    print(acc)
+    return acc
+
+
+def select_prompt(state):
+    if state["state"] == "SHOP":
+        return SHOP_PROMPT
+    if state["state"] == "BUFFOON_PACK":
+        return BOOSTER_PROMPT
+
+
+def parse_cmd(cmd):
+    cmd = cmd.strip()
+    action, *rest = cmd.split(" ")
+    if action == "buy":
+        return {
+            "action": action,
+            "type": rest[0],
+            "position": int(rest[1]),
+        }
+    elif action in ["play", "discard"]:
+        return {
+            "action": action,
+            "positions": int(rest[0]),
+        }
+    elif action == "select":
+        return {
+            "action": action,
+            "position": int(rest[0]),
+        }
+    elif action in ["skip", "next"]:
+        return {
+            "action": action,
+        }
+
+
+def generate_action(state):
+    client = anthropic.Anthropic()
+    state_string = build_state_string(state)
+    state_prompt = f"{select_prompt(state)}\n{state_string}"
     message = client.messages.create(
         model="claude-3-5-sonnet-20241022",
         max_tokens=1000,
@@ -79,13 +166,11 @@ while game.score < 300 and game.hands > 0:
         messages=[
             {
                 "role": "user",
-                "content": [{"type": "text", "text": str(game)}],
+                "content": [{"type": "text", "text": state_prompt}],
             }
         ],
     )
     cmd, reasoning = message.content[0].text.split("===")
-    cmd = cmd.strip()
-    print(cmd)
-    print(reasoning)
-    game.execute_command(cmd)
-    print("--------------------")
+    print(f"Command: {cmd}")
+    print(f"Reasoning: {reasoning}")
+    return parse_cmd(cmd)
