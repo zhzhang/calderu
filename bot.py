@@ -4,16 +4,35 @@ from balatro.game import Game
 
 SYSTEM_PROMPT = """
 You are playing Balatro, a game based on Poker.
-The goal of each round is to play hands to reach a certain total chips.
+The game is played in a series of rounds, each with a different set of rules.
+The goal of each round is to play hands to reach a certain total chips threshold to pass the round.
+You will have a limited number of hands and discards to reach the threshold.
+In between rounds, you will have the opportunity to shop for items to help you in the game.
+You will also have the opportunity to choose to play a round, to earn money and use your power up cards, or to skip a round in order to receive a helpful tag.
 
+When responding to a prompt with your move, make sure to respond first with the command you with to execute,
+then with === as a separator, then your reasoning for the move.
+
+"""
+
+BLIND_SELECT_PROMPT = """
+You are on the round track. You may choose to play or skip the Current Rlind.
+To play the current round, type "play_round". It must be "play_round" exactly, and not "play".
+To skip the current round, type "skip".
+If you skip the current round, you receive a tag instead, which has the stated benefits.
+However, you will miss the round reward money, and will not be able to shop for the round, meaning you will be unable to power up your deck.
+"""
+
+ROUND_PROMPT = """
 You will be given a list of poker cards.
 
 You may select UP TO 5 cards to play or discard.
 The possible commands are:
 play <card1> <card2> ... <card5> - Play the selected cards and draw new ones from the deck.
 discard <card1> <card2> ... <card5> - Discard the selected cards and draw new ones from the deck up to the original number of cards in hand.
+Note: cards in the move must be SPACE separated and NOT comma separated.
 
-For example: "p 1 2 3" with the following cards will play the first three cards:
+For example: "play 1 2 3" with the following cards will play the first three cards:
 0: FIVE of HEARTS
 1: SEVEN of SPADES
 2: TEN of SPADES
@@ -23,6 +42,7 @@ For example: "p 1 2 3" with the following cards will play the first three cards:
 6: FOUR of DIAMONDS
 7: SEVEN of HEARTS
 which are the FIVE of HEARTS, SEVEN of SPADES, and TEN of SPADES.
+"discard 1 2 3" will instead discard these cards and draw new ones from the deck.
 
 The possible hands and their base chips are:
 Pair: 10 chips * 2 multiplier
@@ -38,30 +58,9 @@ Royal Flush: 100 chips * 8 multiplier
 The chips of each card participating in hand is added to the base chips before that total is multiplied by the multiplier.
 Cards are only scored if they participate in the hand.
 
-You must make a total of 300 chips within 4 hands and 3 discards to win.
-
-When making a move, please respond first with the command you with to execute,
-then with === as a separator, then your reasoning for the move.
-
-You must win within the allotted hands and discards, or the world ends, so don't save any discards.
-Discarding cards is a good way to create stronger hands, by searching the remaining deck for the best cards to play.
-You should try to discard cards until you can make at least a flush.
-
 The maximum number of cards you can select for play or discard from a hand is 5.
 
 GAME STATE:
-"""
-
-ROUND_TRACK_PROMPT = """
-You are on the round track. You may choose to play or skip the current round.
-If you skip the current round, you receive a tag instead.
-To play the current round, type "play".
-To skip the current round, type "skip".
-"""
-
-ROUND_PROMPT = """
-Available actions:
-play <card1> <card2> ... <card5> - Play the selected cards and draw new ones from the deck.
 """
 
 SHOP_PROMPT = """
@@ -99,10 +98,23 @@ def describe_pack_object(obj):
 def build_state_string(state):
     acc = ""
     game_step = state["state"]
+    if game_step == "BLIND_SELECT":
+        for blind in ["Small", "Big", "Boss"]:
+            blind_info = state["blind_info"][blind]
+            if blind_info["state"] == "Select":
+                acc += f"Current Blind: {blind}\n"
+                acc += f"Chips Needed: {blind_info['chips_needed']}\n"
+                acc += f"Tag: {blind_info['tag']}, {blind_info['tag_description']}\n"
+            elif blind_info["state"] == "Upcoming":
+                acc += f"Upcoming Blind: {blind}\n"
+                acc += f"Chips Needed: {blind_info['chips_needed']}\n"
+            if blind == "Boss":
+                acc += f"Boss Description: {blind_info['boss_description']}\n"
+            acc += f"Reward: {blind_info['reward']}\n"
     if game_step in ["SELECTING_HAND"]:
         acc += hand_to_string(state["hand"])
-        acc += f"Remaining hands: {state['hands_left']})\n"
-        acc += f"Remaining discards: {state['discards_left']})\n"
+        acc += f"Remaining hands: {state['hands_left']}\n"
+        acc += f"Remaining discards: {state['discards_left']}\n"
     if game_step == "SHOP":
         acc += "Shop Cards:\n"
         for i, card in enumerate(state["shop_cards"]):
@@ -127,6 +139,10 @@ def select_prompt(state):
         return SHOP_PROMPT
     if state["state"] == "BUFFOON_PACK":
         return BOOSTER_PROMPT
+    if state["state"] == "BLIND_SELECT":
+        return BLIND_SELECT_PROMPT
+    if state["state"] == "SELECTING_HAND":
+        return ROUND_PROMPT
 
 
 def parse_cmd(cmd):
@@ -141,14 +157,14 @@ def parse_cmd(cmd):
     elif action in ["play", "discard"]:
         return {
             "action": action,
-            "positions": int(rest[0]),
+            "positions": [int(x) for x in rest],
         }
     elif action == "select":
         return {
             "action": action,
             "position": int(rest[0]),
         }
-    elif action in ["skip", "next"]:
+    elif action in ["skip", "play_round", "next"]:
         return {
             "action": action,
         }
@@ -171,6 +187,7 @@ def generate_action(state):
         ],
     )
     cmd, reasoning = message.content[0].text.split("===")
+    cmd = cmd.lower()
     print(f"Command: {cmd}")
     print(f"Reasoning: {reasoning}")
     return parse_cmd(cmd)

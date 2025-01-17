@@ -5,23 +5,17 @@
 import json
 from typing import Any
 
-from fastapi import FastAPI
-from pydantic import BaseModel, Json
-from websockets.asyncio.server import serve
+from fastapi import FastAPI, Request
 
 from bot import generate_action
 
 app = FastAPI()
 
 
-class ActionRequest(BaseModel):
-    state: Json[Any]
-
-
-@app.post("/get-action")
-async def get_action(req: ActionRequest):
-    state = json.loads(req.state)
+@app.post("/")
+async def get_action(request: Request):
+    state = await request.json()
     print(state)
     action = generate_action(state)
     print(action)
-    # await websocket.send(json.dumps(action))
+    return action

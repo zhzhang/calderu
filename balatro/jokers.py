@@ -5,12 +5,14 @@ class Joker(ABC):
     def __init__(self, game):
         self.game = game
 
+
+class OnPlayMixin(ABC):
     @abstractmethod
     def trigger(self):
         pass
 
 
-class BaseJoker(Joker):
+class BaseJoker(Joker, OnPlayMixin):
     """
     Adds 4 to the mult.
     """
@@ -23,12 +25,20 @@ class BaseJoker(Joker):
         round.mult += 4
 
 
-class Greedy(Joker):
+class Greedy(Joker, OnPlayMixin):
+    """
+    Played cards with diamond suit give +3 Mult when scored.
+    """
+
     def __init__(self, game):
         super().__init__(game)
 
 
 class Lusty(Joker):
+    """
+    Played cards with hearts suit give +3 Mult when scored.
+    """
+
     def __init__(self, game):
         super().__init__(game)
 
@@ -91,3 +101,22 @@ class Devious(Joker):
 class Crafty(Joker):
     def __init__(self, game):
         super().__init__(game)
+
+
+AVAILABLE_JOKERS = [
+    BaseJoker,
+    Greedy,
+    Lusty,
+    Wrathful,
+    Gluttonous,
+    Jolly,
+    Zany,
+    Mad,
+    Crazy,
+    Droll,
+    Sly,
+    Wily,
+    Clever,
+    Devious,
+    Crafty,
+]
